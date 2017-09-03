@@ -4,7 +4,6 @@ import scala.collection.immutable.Seq
 import scala.meta._
 
 
-
 class cache[K, V](backend: SyncCache[K, V])
     extends scala.annotation.StaticAnnotation {
 
@@ -29,37 +28,35 @@ class cache[K, V](backend: SyncCache[K, V])
 object CacheMacroImpl {
 
   def expand(fnTypeParams: Seq[Type], cacheExpr: Term.Arg, annotatedDef: Defn.Def): Term = {
-    val cache = Term.Name(cacheExpr.syntax)
+    val cache: Term.Name = Term.Name(cacheExpr.syntax)
     annotatedDef match {
-      case q"..$_ def $methodName[..$tps]($nonCurriedParam): $rtType = $expr" =>
-
-        val paramAsArg = Term.Name(nonCurriedParam.name.value)
-        q"""
-        val result: ${fnTypeParams(1)} = $cache.get($paramAsArg) match {
-          case Some(r) =>
-            r
-          case None =>
-           val r = ${annotatedDef.body}
-           $cache.put($paramAsArg, r)
-           r
-        }
-
-        result
-        """
       case q"..$_ def $methodName[..$tps](..$nonCurriedParams): $rtType = $expr" =>
-        val paramAsArg = nonCurriedParams.map(p => Term.Name(p.name.value))
-        q"""
-        val result: ${fnTypeParams(1)} = $cache.get(..$paramAsArg) match {
-          case Some(r) =>
-            r
-          case None =>
-           val r = ${annotatedDef.body}
-           $cache.put((..$paramAsArg), r)
-           r
-        }
 
-        result
-        """
+        if (nonCurriedParams.size == 1) {
+          val paramAsArg = Term.Name(nonCurriedParams.head.name.value)
+          q"""
+            val result: ${rtType} = $cache.get($paramAsArg) match {
+              case Some(v) => v
+              case None =>
+                val value = ${expr}
+                $cache.put($paramAsArg, value)
+                value
+            }
+            result
+           """
+        } else {
+          val paramAsArg = nonCurriedParams.map(p => Term.Name(p.name.value))
+          q"""
+            val result: ${rtType} = $cache.get((..$paramAsArg)) match {
+              case Some(v) => v
+              case None =>
+                val value = ${expr}
+                $cache.put((..$paramAsArg), value)
+                value
+            }
+            result
+           """
+        }
       case other => abort(s"Expected non-curried method, got $other")
     }
   }

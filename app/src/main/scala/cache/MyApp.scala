@@ -30,5 +30,4 @@ object MyApp extends App {
   testMultipleArg(2, 3)
   testMultipleArg(2, 3)
   testMultipleArg(2, 3)
-  println("Hello Scala.meta macros!")
 }
